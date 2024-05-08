@@ -64,6 +64,14 @@ router.get("/fetch", async (req, res) => {
 
 router.get("/names", async (req, res) => {
   try {
+    const existingPokemonData = await Pokemon.find();
+
+    // If data exists, return it
+    if (existingPokemonData.length > 0) {
+      console.log("Pokémon names already exist in the database");
+      const pokemonList = existingPokemonData.map((pokemon) => pokemon.name);
+      return res.json(pokemonList);
+    }
     console.log("Fetching Pokémon names from external API...");
     const response = await axios.get("https://pokeapi.co/api/v2/pokemon");
     const pokemonList = response.data.results.map((pokemon) => pokemon.name);
