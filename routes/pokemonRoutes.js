@@ -6,6 +6,14 @@ const Pokemon = require("../models/Pokemon");
 
 router.get("/fetch", async (req, res) => {
   try {
+     // Check if data exists in the database
+     const existingPokemonData = await Pokemon.find();
+     // If data exists, return it
+     if (existingPokemonData.length > 0) {
+       console.log("Pokémon data already exists in the database");
+       return res.json(existingPokemonData);
+     }
+
     console.log("Fetching Pokémon data from external API...");
     const response = await axios.get("https://pokeapi.co/api/v2/pokemon");
     const pokemonData = response.data.results;
@@ -23,22 +31,29 @@ router.get("/fetch", async (req, res) => {
       const pokemonDetailResponse = await axios.get(pokemon.url);
       const pokemonDetailData = pokemonDetailResponse.data;
 
+      // Construct a new Pokemon object
+      const newPokemon = new Pokemon({
+        name: pokemon.name,
+        url: pokemon.url,
+      });
+        await newPokemon.save();
       // Construct a new PokemonDetails object
-      const newPokemonDetail = {
+      const newPokemonDetail = new PokemonDetails({
+        pokemonId: newPokemon._id, // Set the reference to Pokemon
         name: pokemonDetailData.name,
         base_experience: pokemonDetailData.base_experience,
         height: pokemonDetailData.height,
         weight: pokemonDetailData.weight,
         location_area_encounters: pokemonDetailData.location_area_encounters,
-      };
-
+        
+      });
       // Add the new PokemonDetails object to the array
       pokemonDetailsArray.push(newPokemonDetail);
+
     }
 
     // Insert new data into the collection using insertMany
     await PokemonDetails.insertMany(pokemonDetailsArray);
-    await Pokemon.insertMany(pokemonData);
 
     res.json(pokemonDetailsArray);
   } catch (error) {
@@ -60,7 +75,6 @@ router.get("/names", async (req, res) => {
 });
 
 router.get("/:name", async (req, res) => {
-  console.log("Oodsjo");
   try {
     console.log("Fetching Pokémon details from external API...");
     const { name } = req.params;

@@ -1,7 +1,9 @@
 // models/PokemonDetails.js
 const mongoose = require("mongoose");
+const Schema = mongoose.Schema; 
 
 const pokemonSchema = new mongoose.Schema({
+  pokemonId: { type: Schema.Types.ObjectId, ref: 'Pokemon' },
   name: {
     type: String,
     required: true,
