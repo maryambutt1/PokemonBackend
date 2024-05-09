@@ -14,15 +14,50 @@ const updateDatabaseJob = async () => {
     const response = await axios.get("https://pokeapi.co/api/v2/pokemon");
     const pokemonData = response.data.results;
 
-    // Update the database with fetched data
-    await Pokemon.deleteMany({});
-    await Pokemon.insertMany(pokemonData);
+    // Fetch existing data from the database
+    const existingPokemonData = await Pokemon.find();
 
-    console.log("Database updated successfully.");
+    // Compare fetched data with existing data
+    const isEqual = compareData(existingPokemonData, pokemonData);
+
+    // If data is different, update the database
+    if (!isEqual) {
+      await Pokemon.deleteMany({});
+      await Pokemon.insertMany(pokemonData);
+      console.log("Database updated successfully.");
+    } else {
+      console.log("Data from external API is same as existing data. No update needed.");
+    }
   } catch (error) {
     console.error("Error updating database:", error);
   }
 };
+
+const compareData = (existingData, newData) => {
+  // Check if the length of both arrays is the same
+  if (existingData.length !== newData.length) {
+    return false;
+  }
+
+  // Sort the arrays by name for consistent comparison
+  const sortedExistingData = existingData.sort((a, b) => a.name.localeCompare(b.name));
+  const sortedNewData = newData.sort((a, b) => a.name.localeCompare(b.name));
+
+  // Compare each item in the arrays
+  for (let i = 0; i < sortedExistingData.length; i++) {
+    const existingPokemon = sortedExistingData[i];
+    const newPokemon = sortedNewData[i];
+
+    // Compare name and URL of each Pokemon
+    if (existingPokemon.name !== newPokemon.name || existingPokemon.url !== newPokemon.url) {
+      return false; // Data is different
+    }
+  }
+
+  // If all items are the same, return true
+  return true;
+};
+
 
 // Schedule the job
 const job = schedule.scheduleJob(jobSchedule, updateDatabaseJob);
