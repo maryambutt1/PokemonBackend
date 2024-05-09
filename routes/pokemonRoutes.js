@@ -6,8 +6,12 @@ const Pokemon = require("../models/Pokemon");
 
 router.get("/fetch", async (req, res) => {
   try {
-     // Check if data exists in the database
-     const existingPokemonData = await Pokemon.find();
+    const { page } = req.query;
+    const limit = 20;
+    const skip = (parseInt(page) - 1) * limit || 0;
+
+    // Check if data exists in the database
+    const existingPokemonData = await Pokemon.find().skip(skip).limit(limit);
      // If data exists, return it
      if (existingPokemonData.length > 0) {
        console.log("Pokémon data already exists in the database");
@@ -15,8 +19,7 @@ router.get("/fetch", async (req, res) => {
      }
 
     console.log("Fetching Pokémon data from external API...");
-    const response = await axios.get("https://pokeapi.co/api/v2/pokemon");
-    const pokemonData = response.data.results;
+    const pokemonData = await fetchAllPokemonData(limit, skip);
 
     await Pokemon.deleteMany({});
 
@@ -28,20 +31,34 @@ router.get("/fetch", async (req, res) => {
 
     // Fetch detailed data for each Pokemon
     for (const pokemon of pokemonData) {
-      const pokemonDetailResponse = await axios.get(pokemon.url);
-      const pokemonDetailData = pokemonDetailResponse.data;
-
       // Construct a new Pokemon object
       const newPokemon = new Pokemon({
         name: pokemon.name,
         url: pokemon.url,
       });
         await newPokemon.save();
+
+        const pokemonDetailData = await fetchPokemonDetails(pokemon.url);
+
+        const abilities = pokemonDetailData.abilities.map((abilityEntry) => {
+          return {
+            ability: {
+              name: abilityEntry.ability.name,
+              url: abilityEntry.ability.url
+            },
+            is_hidden: abilityEntry.is_hidden,
+            slot: abilityEntry.slot
+          };
+        });
+
       // Construct a new PokemonDetails object
       const newPokemonDetail = new PokemonDetails({
         pokemonId: newPokemon._id, // Set the reference to Pokemon
         name: pokemonDetailData.name,
+        abilities: abilities, // Assign abilities array
         base_experience: pokemonDetailData.base_experience,
+        order: pokemonDetailData.order,
+        is_default: pokemonDetailData.is_default,
         height: pokemonDetailData.height,
         weight: pokemonDetailData.weight,
         location_area_encounters: pokemonDetailData.location_area_encounters,
@@ -61,6 +78,21 @@ router.get("/fetch", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+async function fetchAllPokemonData(limit,skip) {
+  let pokemonData = [];
+  let nextUrl = `https://pokeapi.co/api/v2/pokemon?limit=${limit}&offset=${skip}`;
+  while (nextUrl) {
+    const response = await axios.get(nextUrl);
+    const data = response.data;
+    pokemonData = [...pokemonData, ...data.results];
+    nextUrl = data.next;
+  }
+  return pokemonData;
+}
+async function fetchPokemonDetails(url) {
+  const response = await axios.get(url);
+  return response.data;
+}
 
 router.get("/names", async (req, res) => {
   try {
