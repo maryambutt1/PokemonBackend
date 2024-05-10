@@ -12,11 +12,11 @@ router.get("/fetch", async (req, res) => {
 
     // Check if data exists in the database
     const existingPokemonData = await Pokemon.find().skip(skip).limit(limit);
-     // If data exists, return it
-     if (existingPokemonData.length > 0) {
-       console.log("Pokémon data already exists in the database");
-       return res.json(existingPokemonData);
-     }
+    // If data exists, return it
+    if (existingPokemonData.length > 0) {
+      console.log("Pokémon data already exists in the database");
+      return res.json(existingPokemonData);
+    }
 
     console.log("Fetching Pokémon data from external API...");
     const pokemonData = await fetchAllPokemonData(limit, skip);
@@ -36,37 +36,62 @@ router.get("/fetch", async (req, res) => {
         name: pokemon.name,
         url: pokemon.url,
       });
-        await newPokemon.save();
+      await newPokemon.save();
 
-        const pokemonDetailData = await fetchPokemonDetails(pokemon.url);
+      const pokemonDetailData = await fetchPokemonDetails(pokemon.url);
 
-        const abilities = pokemonDetailData.abilities.map((abilityEntry) => {
+      const abilities = pokemonDetailData.abilities.map((abilityEntry) => {
+        return {
+          ability: {
+            name: abilityEntry.ability.name,
+            url: abilityEntry.ability.url,
+          },
+          is_hidden: abilityEntry.is_hidden,
+          slot: abilityEntry.slot,
+        };
+      });
+      const forms = pokemonDetailData.forms.map((formEntry) => {
+        return {
+          name: formEntry.name,
+          url: formEntry.url,
+        };
+      });
+      const gameIndices = pokemonDetailData.game_indices.map(
+        (gameIndexEntry) => {
           return {
-            ability: {
-              name: abilityEntry.ability.name,
-              url: abilityEntry.ability.url
+            game_index: gameIndexEntry.game_index,
+            version: {
+              name: gameIndexEntry.version.name,
+              url: gameIndexEntry.version.url,
             },
-            is_hidden: abilityEntry.is_hidden,
-            slot: abilityEntry.slot
           };
-        });
-
+        }
+      );
+      
       // Construct a new PokemonDetails object
       const newPokemonDetail = new PokemonDetails({
         pokemonId: newPokemon._id, // Set the reference to Pokemon
         name: pokemonDetailData.name,
         abilities: abilities, // Assign abilities array
+        cries: {
+          latest: pokemonDetailData.cries.latest,
+          legacy: pokemonDetailData.cries.legacy,
+        },
+        forms: forms,
+        game_indices: gameIndices,
+        species: {
+          name: pokemonDetailData.species.name,
+          url: pokemonDetailData.species.url,
+        },
         base_experience: pokemonDetailData.base_experience,
         order: pokemonDetailData.order,
         is_default: pokemonDetailData.is_default,
         height: pokemonDetailData.height,
         weight: pokemonDetailData.weight,
         location_area_encounters: pokemonDetailData.location_area_encounters,
-        
       });
       // Add the new PokemonDetails object to the array
       pokemonDetailsArray.push(newPokemonDetail);
-
     }
 
     // Insert new data into the collection using insertMany
